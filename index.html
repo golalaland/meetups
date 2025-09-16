@@ -1,0 +1,231 @@
+<!-- Profile Carousel Container -->
+<div id="profile-wrapper">
+  <div id="profiles-container"></div>
+  <div class="nav-buttons">
+    <button id="prev-btn">Prev</button>
+    <button class="meet-btn">Meet</button>
+    <button id="next-btn">Next</button>
+  </div>
+</div>
+
+<style>
+/* Wrapper */
+#profile-wrapper {
+  text-align: center;
+  max-width: 360px;
+  width: 95%;
+  margin: 0 auto;
+  background: #000;
+  padding: 10px;
+  border-radius: 14px;
+  color: #fff;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Profile Cards */
+.profile {
+  display: none;
+  border-radius: 14px;
+  margin-bottom: 10px;
+}
+.profile.active { display: block; }
+
+/* Slider & Video */
+.slider {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 14px;
+  margin-bottom: 6px;
+}
+.slides {
+  display: flex;
+  transition: transform 0.3s ease;
+}
+.slides video {
+  width: 90%;
+  max-width: 280px;
+  margin: 0 auto;
+  display: block;
+  aspect-ratio: 9/16;
+  border-radius: 14px;
+  background: #000;
+  object-fit: contain;
+}
+
+/* Video Nav Arrows */
+.video-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 28px;
+  color: #fff;
+  background: rgba(0,0,0,0.5);
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 50%;
+  user-select: none;
+  z-index: 5;
+}
+.video-nav.left { left: 6px; }
+.video-nav.right { right: 6px; }
+
+/* Bio Card */
+.bio-card {
+  background: #000;
+  color: #fff;
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  margin-bottom: 10px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.profile.active .bio-card {
+  opacity: 1;
+  transform: translateY(0);
+}
+.bio-name { font-size: 20px; font-weight: 800; margin-bottom: 2px; }
+.bio-info { font-size: 13px; line-height: 1.3; color: #aaa; margin-bottom: 2px; }
+.bio-info span { font-weight: 600; color: #fff; }
+.fruit-pick { font-size: 18px; font-weight: 700; margin: 4px 0; }
+
+/* Nav Buttons */
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  gap: 4px;
+}
+.nav-buttons button, .meet-btn {
+  padding: 5px 14px;
+  border-radius: 800px;
+  font-weight: 900;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+  background: #DFF41F;
+  color: #000;
+  transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
+  flex: 1;
+}
+.nav-buttons button:hover, .meet-btn:hover {
+  transform: scale(1.08);
+  background: #c8db1c;
+  box-shadow: 0 4px 10px rgba(223, 244, 31, 0.6);
+}
+.meet-btn { flex: 1; max-width: 100px; margin: 0 auto; }
+
+/* Mobile Safari fix */
+@supports (-webkit-touch-callout: none) {
+  .slides video { object-fit: contain !important; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('profiles-container');
+  let allProfiles = [];
+  let activeIndex = 0;
+  const API_KEY = '7dli8bleg4bq8';
+  let sessionViews = JSON.parse(sessionStorage.getItem('viewedProfiles') || '[]');
+
+  fetch(`https://sheetdb.io/api/v1/${API_KEY}?limit=50`)
+    .then(res => res.json())
+    .then(profiles => {
+      allProfiles = profiles;
+      renderProfiles(profiles);
+      showProfile(activeIndex);
+    });
+
+  function renderProfiles(profiles) {
+    profiles.forEach(profile => {
+      const profileDiv = document.createElement('div');
+      profileDiv.classList.add('profile');
+      profileDiv.dataset.customId = profile.CustomID;
+
+      // Slider
+      const slider = document.createElement('div'); slider.classList.add('slider');
+      const slides = document.createElement('div'); slides.classList.add('slides');
+
+      // Video nav arrows
+      const leftArrow = document.createElement('div');
+      leftArrow.classList.add('video-nav', 'left');
+      leftArrow.innerHTML = '&#10094;';
+      const rightArrow = document.createElement('div');
+      rightArrow.classList.add('video-nav', 'right');
+      rightArrow.innerHTML = '&#10095;';
+      slider.appendChild(slides);
+      slider.appendChild(leftArrow);
+      slider.appendChild(rightArrow);
+
+      profileDiv.appendChild(slider);
+
+      // Bio card
+      const bio = document.createElement('div'); bio.classList.add('bio-card');
+      bio.innerHTML = `
+        <div class="bio-name">${profile.Name}</div>
+        <div class="bio-info"><span>📍 Location:</span> ${profile.Location}</div>
+        <div class="bio-info"><span>🎂 Age:</span> ${profile.Age}</div>
+        <div class="bio-info"><span>💖 Orientation:</span> ${profile.Orientation}</div>
+        <div class="fruit-pick">${profile.FruitPick||''}</div>
+      `;
+      profileDiv.appendChild(bio);
+      container.appendChild(profileDiv);
+
+      // Render videos
+      const videoURLs = (profile.VideoIDs || '').split(/[\n,]+/).map(u=>u.trim()).filter(Boolean);
+      let currentVideo = 0;
+      const videoEls = videoURLs.map(url => {
+        const v = document.createElement('video');
+        v.src = url;
+        v.autoplay = true;
+        v.muted = true;
+        v.loop = true;
+        v.playsInline = true;
+        v.controls = false;
+        v.style.display = 'none';
+        slides.appendChild(v);
+        return v;
+      });
+      if(videoEls.length) videoEls[0].style.display='block';
+
+      leftArrow.addEventListener('click', () => {
+        videoEls[currentVideo].style.display='none';
+        currentVideo = (currentVideo - 1 + videoEls.length) % videoEls.length;
+        videoEls[currentVideo].style.display='block';
+      });
+      rightArrow.addEventListener('click', () => {
+        videoEls[currentVideo].style.display='none';
+        currentVideo = (currentVideo + 1) % videoEls.length;
+        videoEls[currentVideo].style.display='block';
+      });
+    });
+  }
+
+  function showProfile(index) {
+    const profiles = document.querySelectorAll('.profile');
+    profiles.forEach(p => p.classList.remove('active'));
+    const current = profiles[index];
+    if (!current) return;
+    current.classList.add('active');
+
+    const profileID = current.dataset.customId;
+    if (profileID && !sessionViews.includes(profileID)) {
+      sessionViews.push(profileID);
+      sessionStorage.setItem('viewedProfiles', JSON.stringify(sessionViews));
+    }
+  }
+
+  document.getElementById('prev-btn').addEventListener('click', () => {
+    activeIndex = (activeIndex > 0) ? activeIndex - 1 : allProfiles.length - 1;
+    showProfile(activeIndex);
+  });
+  document.getElementById('next-btn').addEventListener('click', () => {
+    activeIndex = (activeIndex < allProfiles.length - 1) ? activeIndex + 1 : 0;
+    showProfile(activeIndex);
+  });
+});
+</script>
